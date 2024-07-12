@@ -1,5 +1,19 @@
 <template>
     <div>
+        <v-toolbar>
+            <v-toolbar-title
+                >家計簿アプリ
+                <span v-if="currentUser == null"
+                    >ログインしていません:ゲスト</span
+                >
+                <span v-else
+                    >ログイン中:{{ currentUser.displayName }}</span
+                ></v-toolbar-title
+            >
+            <p>ログイン</p>
+            <v-btn icon><v-icon>mdi-login</v-icon></v-btn>
+        </v-toolbar>
+
         <h1>Firebase Authentication Example</h1>
         <p class="lead">
             Hello!Username:{{ currentUser ? currentUser.displayName : "" }}

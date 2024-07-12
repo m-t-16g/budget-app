@@ -9,6 +9,7 @@ import {
 
 export const useFirestore = () => {
     const db = getFirestore();
-    const getData = async () => await getDocs(collection(db, "budget"));
-    return { db, getData };
+    const getSnapshot = async () => await getDocs(collection(db, "budget"));
+
+    return { db, getSnapshot };
 };
