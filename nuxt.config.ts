@@ -5,11 +5,11 @@ export default defineNuxtConfig({
     compatibilityDate: "2024-04-03",
     // 開発ツールの有効化
     devtools: {
-      enabled: true,
-
-      timeline: {
         enabled: true,
-      },
+
+        timeline: {
+            enabled: true,
+        },
     },
     // ビルド設定
     build: { transpile: ["vuetify"] },
@@ -27,6 +27,12 @@ export default defineNuxtConfig({
             template: {
                 transformAssetUrls,
             },
+        },
+    },
+    app: {
+        head: {
+            title: "家計簿アプリ",
+            charset: "utf-8",
         },
     },
 });

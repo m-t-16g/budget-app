@@ -34,6 +34,7 @@
                             v-model="accountEntry.password"
                             label="パスワード"
                             type="password"
+                            :rules="[rules.password]"
                         ></v-text-field>
                         <v-btn
                             class="text-none"
@@ -76,7 +77,7 @@
                         >データの作成、読み出し、変更、削除ができる家計簿アプリです</v-list-item
                     >
                     <v-list-item
-                        >ログインしていない時はゲストデータを、ログインしている時はそのユーザのデータを閲覧できます</v-list-item
+                        >ログインしていない時はゲストデータを、ログインしている時はそのユーザのデータを閲覧できます。カテゴリーも横の歯車ボタンからユーザごとにカスタム可能です</v-list-item
                     >
                     <v-list-item
                         >ログイン方法は "メールアドレスとパスワード"
@@ -93,8 +94,69 @@
                     <v-select
                         v-model="newEntry.category"
                         :items="categories"
+                        prepend-inner-icon="mdi-cog"
                         label="カテゴリー"
+                        @click:prepend-inner="toggleCatDialog"
                     ></v-select>
+                    <v-dialog v-model="catDialog"
+                        ><v-card title="カテゴリー変更" class="mx-auto"
+                            ><template v-slot:append>
+                                <div>
+                                    <v-btn
+                                        icon="mdi-close"
+                                        variant="text"
+                                        @click="toggleCatDialog"
+                                    ></v-btn>
+                                </div>
+                            </template>
+                            <v-list density="compact">
+                                <v-list-item
+                                    v-for="(category, index) in categories"
+                                    :key="index"
+                                >
+                                    <template v-slot:prepend>
+                                        <v-icon
+                                            icon="mdi-minus-circle"
+                                            @click="removeCategories(index)"
+                                        ></v-icon>
+                                    </template>
+                                    <v-list-item-title>
+                                        {{ category }}
+                                    </v-list-item-title>
+                                    <template v-slot:append>
+                                        <v-checkbox-btn
+                                            v-model="isPositive[category]"
+                                            color="success"
+                                            label="収入源"
+                                        ></v-checkbox-btn>
+                                    </template>
+                                </v-list-item>
+                                <v-list-item>
+                                    <template v-slot:prepend>
+                                        <v-icon
+                                            icon="mdi-plus-circle"
+                                            @click="addCategories"
+                                        ></v-icon>
+                                    </template>
+                                    <v-list-item-title
+                                        ><v-text-field
+                                            v-model="newCategory"
+                                            label="追加"
+                                            variant="underlined"
+                                            density="compact"
+                                            :rules="[rules.noEmpty]"
+                                        ></v-text-field
+                                    ></v-list-item-title>
+                                </v-list-item>
+                            </v-list>
+                            <v-card-actions>
+                                <v-btn
+                                    prepend-icon="mdi-content-save"
+                                    text="保存して閉じる"
+                                    @click="saveCustomCategories"
+                                ></v-btn>
+                            </v-card-actions> </v-card
+                    ></v-dialog>
                 </v-col>
                 <v-col cols="2">
                     <v-text-field
@@ -210,7 +272,9 @@
                         <template v-slot:item.amount="{ item }">
                             <v-chip
                                 :color="
-                                    item.category == '収入' ? 'green' : 'red'
+                                    isPositive[item.category] == true
+                                        ? 'green'
+                                        : 'red'
                                 "
                                 :text="item.amount"
                                 label
@@ -237,7 +301,6 @@
 </template>
 
 <script>
-import Chart from "~/components/PieChart.vue";
 // firestore関係のimport
 import {
     getFirestore,
@@ -264,10 +327,8 @@ import {
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
 } from "firebase/auth";
-import PieChart from "~/components/PieChart.vue";
 
 export default defineComponent({
-    components: { PieChart },
     data() {
         return {
             // 編集時に必要な配列の番号
@@ -290,6 +351,15 @@ export default defineComponent({
             },
             // カテゴリー名
             categories: ["収入", "消耗品費", "食費", "交通費", "その他"],
+
+            newCategory: "",
+            isPositive: {
+                収入: true,
+                消耗品費: false,
+                食費: false,
+                交通費: false,
+                その他: false,
+            },
             // 表示するデータ
             entries: [],
             displayEntry: [],
@@ -310,6 +380,14 @@ export default defineComponent({
             rules: {
                 positive: (value) =>
                     value >= 0 || "マイナスの値を入力しないでください",
+                noEmpty: (value) => {
+                    if (value) return true;
+                    return "空白は許可されていません";
+                },
+                password: (value) => {
+                    if (value.length >= 6) return true;
+                    return "パスワードは6文字以上にしてください";
+                },
             },
             // 編集ダイアログのコントロール
             dialog: false,
@@ -321,6 +399,8 @@ export default defineComponent({
             loginDialog: false,
             // ログインフォームの入力内容
             accountEntry: { mail: "", password: "" },
+            // カテゴリーダイアログのコントロール
+            catDialog: false,
         };
     },
     computed: {
@@ -329,7 +409,7 @@ export default defineComponent({
             let sum = { balance: 0, income: 0, spend: 0 };
             this.entries.forEach((entry) => {
                 if (entry.owner == this.currentUID) {
-                    if (entry.category == "収入") {
+                    if (this.isPositive[entry.category]) {
                         sum.balance += parseInt(entry.amount);
                         sum.income += parseInt(entry.amount);
                     } else {
@@ -350,8 +430,36 @@ export default defineComponent({
             });
             return displayEntry;
         },
+        posCheck: function (cat) {
+            return this.isPositive[cat];
+        },
     },
     methods: {
+        // カテゴリー編集メソッドとダイアログの閉会
+        toggleCatDialog() {
+            this.catDialog = !this.catDialog;
+        },
+        addCategories() {
+            if (this.newCategory) {
+                this.categories.push(this.newCategory);
+                this.isPositive[this.newCategory] = "false";
+                this.newCategory = "";
+            }
+        },
+        removeCategories(i) {
+            delete this.isPositive[this.categories[i]];
+            this.categories.splice(i, 1);
+        },
+        // カテゴリーをDBに保存
+        async saveCustomCategories() {
+            const uid = this.currentUID;
+            await setDoc(doc(useFirestore().db, "customCategories", uid), {
+                categories: this.categories,
+                isPositive: this.isPositive,
+            });
+            this.catDialog = !this.catDialog;
+        },
+        // データベースからカスタムカテゴリをロード
         // エントリーを追加するメソッド
         addEntry() {
             // 新しいエントリーの条件チェック(空やマイナスの数値をはじく)
@@ -449,6 +557,13 @@ export default defineComponent({
                 })
                 .catch((error) => {
                     console.log(error.code, error.message);
+                    if (error.code == "auth/user-not-found") {
+                        window.alert(
+                            "メールアドレスが間違っているか、ユーザが登録されていません"
+                        );
+                    } else if (error.code == "auth/wrong-password") {
+                        window.alert("パスワードが間違っています。");
+                    }
                 });
         },
         // メールアドレスを使ったアカウント作成
@@ -465,6 +580,9 @@ export default defineComponent({
                 })
                 .catch((error) => {
                     console.log(error.code, error.message);
+                    window.alert(
+                        "エラーが発生したため、最初からやり直してください"
+                    );
                 });
         },
     },
@@ -474,9 +592,40 @@ export default defineComponent({
             if (user != null) {
                 this.currentUser = user;
                 this.currentUID = user.uid;
+                const getCat = async () => {
+                    const catSnap = await getDoc(
+                        doc(useFirestore().db, "customCategories", user.uid)
+                    );
+                    console.log(catSnap.exists());
+                    if (catSnap.exists()) {
+                        console.log(catSnap.data());
+                        this.categories = catSnap.data().categories;
+                        this.isPositive = catSnap.data().isPositive;
+                    } else {
+                        console.log("nodata");
+                        const templateSnap = await getDoc(
+                            doc(
+                                useFirestore().db,
+                                "customCategories",
+                                "template"
+                            )
+                        );
+                        this.categories = templateSnap.data().categories;
+                        this.isPositive = templateSnap.data().isPositive;
+                    }
+                };
+                getCat();
             } else {
                 this.currentUser = null;
                 this.currentUID = "guest";
+                const getCat = async () => {
+                    const catSnap = await getDoc(
+                        doc(useFirestore().db, "customCategories", "guest")
+                    );
+                    this.categories = catSnap.data().categories;
+                    this.isPositive = catSnap.data().isPositive;
+                };
+                getCat();
             }
         });
         // ページがマウントされた時に、データベースにアクセスしてスナップショットを持ってくる
@@ -495,7 +644,6 @@ export default defineComponent({
             });
         });
     },
-    async beforeUpdate() {},
 });
 </script>
 
