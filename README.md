@@ -1,75 +1,28 @@
-# Nuxt 3 Minimal Starter
+# 家計簿アプリ
 
-Look at the [Nuxt 3 documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Vue フレームワーク Nuxt 及び、firebase の Auth 機能と、firestoredatabase 利用の技術学習のために制作した SSG の家計簿アプリです。  
+ユーザごとに収支データ、設定データの保存が可能です。
 
-## Setup
+## データベース構造
 
-Make sure to install the dependencies:
+-   budget コレクション(ドキュメント id は自動生成)
 
-```bash
-# npm
-npm install
+    -   amount 支出及び収入額
+    -   category カテゴリー
+    -   date 日付
+    -   owner オーナー(ユーザ id で識別)
+    -   title 題名
 
-# pnpm
-pnpm install
+-   customCategories コレクション(ユーザ id=ドキュメント id)
+    -   categories コレクション
+        -   以下カスタムしたカテゴリーを列挙
+    -   isPositive コレクション
+        -   以下 bool 値で収入か支出かの判定
 
-# yarn
-yarn install
+## 認証
 
-# bun
-bun install
-```
+GoogleFirebase の Auth 機能をそのまま利用し、ユーザ認証を行っています。メールアドレスとパスワードによるユーザ登録および認証と、Google アカウントによる認証を実装、アプリ内では Auth 機能から与えられたユーザ id を利用してユーザを識別しています。
 
-## Development Server
+## 利用フレームワーク
 
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
-npm run dev
-
-# pnpm
-pnpm run dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
-```
-
-## Production
-
-Build the application for production:
-
-```bash
-# npm
-npm run build
-
-# pnpm
-pnpm run build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm run preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+外観は Vue フレームワーク Vuetify を用いて設計しました。データテーブルや入力フォームの実装、mdi アイコンの利用が容易である等を考え選定しました。
